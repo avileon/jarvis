@@ -1,0 +1,37 @@
+name: Android APK
+on:
+  workflow_dispatch:
+    inputs:
+      server_url: { description: "Server URL", default: "https://jarvis.vibit.co.il/" }
+      min_sdk: { description: "minSdk (21 = Android 5, 24 = Android 7)", default: "24" }
+  push:
+    tags: ["apk-v*"]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.11.1" }
+      - name: Keystore
+        env: { KS: "${{ secrets.JARVIS_KEYSTORE_B64 }}" }
+        run: |
+          if [ -n "$KS" ]; then echo "$KS" | base64 -d > $RUNNER_TEMP/jarvis.jks; echo "JARVIS_KEYSTORE=$RUNNER_TEMP/jarvis.jks" >> $GITHUB_ENV; else echo "::warning::No JARVIS_KEYSTORE_B64 secret — APK will be debug-signed"; fi
+      - name: Build
+        working-directory: android
+        env:
+          JARVIS_KEYSTORE_PASSWORD: ${{ secrets.JARVIS_KEYSTORE_PASSWORD }}
+        run: |
+          gradle assembleRelease --no-daemon \
+            -PjarvisServerUrl="${{ github.event.inputs.server_url || 'https://jarvis.vibit.co.il/' }}" \
+            -PjarvisMinSdk="${{ github.event.inputs.min_sdk || '24' }}" \
+            -PjarvisVersionCode=${{ github.run_number }} -PjarvisVersionName="0.1.${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk ../jarvis-station.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: jarvis-station-apk, path: jarvis-station.apk }
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with: { files: jarvis-station.apk }

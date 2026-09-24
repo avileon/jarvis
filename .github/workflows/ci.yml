@@ -1,0 +1,42 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: jarvis, POSTGRES_PASSWORD: jarvis, POSTGRES_DB: jarvis_test }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run typecheck -w server
+      - run: npm test -w server
+        env: { TEST_DATABASE_URL: "postgres://jarvis:jarvis@localhost:5432/jarvis_test" }
+      - run: npm run build -w web
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t jarvis-app:ci .
+      - name: Smoke test container
+        run: |
+          docker network create jn
+          docker run -d --name db --network jn -e POSTGRES_USER=jarvis -e POSTGRES_PASSWORD=jarvis -e POSTGRES_DB=jarvis postgres:16-alpine
+          sleep 8
+          docker run -d --name app --network jn -p 3000:3000 \
+            -e DATABASE_URL=postgres://jarvis:jarvis@db:5432/jarvis \
+            -e JARVIS_MASTER_KEY=$(openssl rand -hex 32) -e SESSION_SECRET=$(openssl rand -hex 32) \
+            -e ADMIN_PASSWORD=ci-password-123 jarvis-app:ci
+          for i in $(seq 1 30); do curl -fs localhost:3000/api/health && break; sleep 2; done
+          curl -fs localhost:3000/ | grep -q '<div id="root">'
+          curl -fsI localhost:3000/ort/ort-wasm-simd-threaded.wasm | grep -qi 'content-type: application/wasm'
+          curl -fsI localhost:3000/wakeword/hey_jarvis_v0.1.onnx
+          docker logs app | tail -5
