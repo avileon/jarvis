@@ -147,12 +147,19 @@ function Jarvis({ onUnpaired }: { onUnpaired: () => void }) {
       await playReply(r.audio, sid);
       if (sid !== sessionId.current) return;
       if (r.error) return goIdle();
+      // "ג'ארביס לך לישון" → standby: back to the slideshow, only the wake word wakes it again.
+      if (r.sleep) {
+        goIdle();
+        setSubtitle('');
+        setView('slideshow');
+        return;
+      }
       // Follow-up: keep listening briefly without the wake word (context carries over).
       if (cfgRef.current.voice.followUpSeconds > 0) listen(cfgRef.current.voice.followUpSeconds * 1000, sid);
       else goIdle();
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [goIdle, playReply],
+    [goIdle, playReply, setView],
   );
 
   const sendAudio = useCallback(

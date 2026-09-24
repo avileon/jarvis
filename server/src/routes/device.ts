@@ -14,6 +14,13 @@ import { listPhotos, photosDir } from '../google/google.js';
 import { sha256 } from '../lib/crypto.js';
 import { config } from '../config.js';
 
+const SLEEP_REPLY = 'בסדר אבי, הולך לישון. תקרא לי כשתצטרך.';
+/** "ג'ארביס לך לישון" and similar — handled locally: no model call, station returns to standby until the wake word. */
+export function isSleepCommand(text: string) {
+  const t = text.replace(/[.,!?״"']/g, ' ').replace(/\s+/g, ' ').trim();
+  return /(^|\s)(לך|תלך|ללכת|לכי|תלכי|הולך)\s*(ל)?(ישון|לישון|שון)(\s|$)|מצב שינה|לילה טוב|תפסיק להקשיב|(^|\s)(זהו )?סיימנו(\s|$)|go to sleep/i.test(t);
+}
+
 let buildId = '';
 function webBuildId() {
   if (!buildId) {
@@ -94,6 +101,7 @@ export async function deviceRoutes(app: FastifyInstance) {
       const seconds = wavDuration(audio) || audio.length / 32000;
       const transcript = await transcribe(audio, file.mimetype || 'audio/wav', seconds);
       if (!transcript || transcript.replace(/[\s.,!?]/g, '').length < 2) return { transcript: '', reply: '', audio: null, empty: true };
+      if (isSleepCommand(transcript)) return { transcript, reply: SLEEP_REPLY, audio: await speakable(SLEEP_REPLY, true), sleep: true };
       const r = await runTurn({ text: transcript, deviceId: req.deviceId, emit });
       return { transcript, reply: r.reply, audio: await speakable(r.reply, true), pendingAction: r.pendingAction ?? null, actions: r.actions };
     } catch (e) {
@@ -108,6 +116,7 @@ export async function deviceRoutes(app: FastifyInstance) {
     const emit = emitter(req.deviceId);
     try {
       emit({ type: 'status', state: 'processing' });
+      if (isSleepCommand(body.text)) return { reply: SLEEP_REPLY, audio: await speakable(SLEEP_REPLY, body.speak), sleep: true };
       const r = await runTurn({ text: body.text, deviceId: req.deviceId, emit });
       return { reply: r.reply, audio: await speakable(r.reply, body.speak), pendingAction: r.pendingAction ?? null, actions: r.actions, conversationId: r.conversationId };
     } catch (e) {

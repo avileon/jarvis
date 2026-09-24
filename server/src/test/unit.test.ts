@@ -62,3 +62,15 @@ describe('drive folder parsing', () => {
     expect(parseFolderId('1AbC_d-9')).toBe('1AbC_d-9');
   });
 });
+
+describe('sleep command', () => {
+  it('detects Hebrew sleep phrases', async () => {
+    process.env.JARVIS_MASTER_KEY ??= 'c'.repeat(64);
+    const { isSleepCommand } = await import('../routes/device.js');
+    expect(isSleepCommand("ג'ארביס, לך לישון.")).toBe(true);
+    expect(isSleepCommand('תלך לישון')).toBe(true);
+    expect(isSleepCommand('לילה טוב')).toBe(true);
+    expect(isSleepCommand('מתי הילדים הולכים לישון בדרך כלל?')).toBe(false);
+    expect(isSleepCommand('מה יש לי היום?')).toBe(false);
+  });
+});
