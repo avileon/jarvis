@@ -62,6 +62,14 @@ export async function deviceRoutes(app: FastifyInstance) {
     return r;
   });
 
+  // Station APK for sideloading on the tablet (placed in DATA_DIR by the deploy step).
+  app.get('/download/jarvis-station.apk', async (_req, reply) => {
+    const p = path.join(config().DATA_DIR, 'jarvis-station.apk');
+    if (!fs.existsSync(p)) return reply.code(404).send({ error: 'APK not uploaded yet' });
+    reply.header('content-type', 'application/vnd.android.package-archive').header('content-disposition', 'attachment; filename="jarvis-station.apk"');
+    return reply.send(fs.createReadStream(p));
+  });
+
   app.get('/api/station/config', { preHandler: requireDevice }, async () => stationConfig());
 
   app.get('/api/tts/ack', { preHandler: requireDeviceOrAdmin }, async (_req, reply) => {
