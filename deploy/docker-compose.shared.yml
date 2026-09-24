@@ -1,0 +1,39 @@
+# For a server that already runs its own reverse proxy (e.g. system Caddy on 80/443).
+# JARVIS listens only on 127.0.0.1:${JARVIS_PORT:-3100}; add caddy-site.conf to the host's Caddyfile.
+name: jarvis
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jarvis
+      POSTGRES_DB: jarvis
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jarvis"]
+      interval: 5s
+      retries: 20
+    mem_limit: 384m
+
+  app:
+    build: ..
+    image: jarvis-app:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://jarvis:${POSTGRES_PASSWORD}@db:5432/jarvis
+      PUBLIC_URL: https://${DOMAIN}
+    ports:
+      - "127.0.0.1:${JARVIS_PORT:-3100}:3000"
+    volumes:
+      - data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 512m
+
+volumes:
+  db:
+  data:
