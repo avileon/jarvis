@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
+import { createHash } from 'node:crypto';
 import { config } from '../config.js';
 import { hmac, randomToken, safeEqual } from '../lib/crypto.js';
 import { q, q1 } from '../lib/db.js';
@@ -185,51 +186,98 @@ export function photosDir() {
   return path.join(config().DATA_DIR, 'photos');
 }
 
+interface PhotoItem {
+  id: string;
+  name: string;
+  version: string;
+  mime?: string;
+  modified?: string;
+  download: () => Promise<Buffer>;
+}
+
+const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36';
+
+/** Shared Google Photos album (public link) — no OAuth needed. Parses image URLs from the share page. */
+export async function albumItems(albumUrl: string): Promise<PhotoItem[]> {
+  const res = await fetch(albumUrl, { headers: { 'user-agent': UA, 'accept-language': 'he,en' }, redirect: 'follow', signal: AbortSignal.timeout(30_000) });
+  if (!res.ok) throw new Error(`Google Photos ${res.status}`);
+  const html = await res.text();
+  const bases = [...new Set(html.match(/https:\/\/lh3\.googleusercontent\.com\/pw\/[A-Za-z0-9_-]{40,}/g) ?? [])];
+  if (!bases.length) throw new Error('לא נמצאו תמונות באלבום. ודא שהקישור הוא אלבום משותף ("כל מי שיש לו את הקישור").');
+  return bases.map((base) => {
+    const id = 'gp_' + createHash('sha256').update(base).digest('hex').slice(0, 24);
+    return {
+      id,
+      name: id,
+      version: id,
+      download: async () => {
+        const r = await fetch(`${base}=w1920-h1920`, { headers: { 'user-agent': UA }, signal: AbortSignal.timeout(60_000) });
+        if (!r.ok) throw new Error(`photo ${r.status}`);
+        return Buffer.from(await r.arrayBuffer());
+      },
+    };
+  });
+}
+
+async function driveItems(folderId: string): Promise<PhotoItem[]> {
+  const files: any[] = [];
+  let pageToken = '';
+  do {
+    const p = new URLSearchParams({
+      q: `'${folderId}' in parents and mimeType contains 'image/' and trashed=false`,
+      fields: 'nextPageToken, files(id,name,md5Checksum,mimeType,modifiedTime)',
+      pageSize: '200',
+      supportsAllDrives: 'true',
+      includeItemsFromAllDrives: 'true',
+    });
+    if (pageToken) p.set('pageToken', pageToken);
+    const data: any = await (await gfetch(`/drive/v3/files?${p}`)).json();
+    files.push(...(data.files ?? []));
+    pageToken = data.nextPageToken ?? '';
+  } while (pageToken && files.length < 2000);
+  return files.map((f) => ({
+    id: f.id,
+    name: f.name,
+    version: f.md5Checksum ?? f.modifiedTime,
+    mime: f.mimeType,
+    modified: f.modifiedTime,
+    download: async () => Buffer.from(await (await gfetch(`/drive/v3/files/${f.id}?alt=media&supportsAllDrives=true`)).arrayBuffer()),
+  }));
+}
+
 let syncing = false;
 export async function syncPhotos(): Promise<{ added: number; removed: number; total: number }> {
   if (syncing) return { added: 0, removed: 0, total: -1 };
   syncing = true;
   try {
     const g = await getSettings('google');
-    if (!g.photosFolderId) throw new Error('לא הוגדרה תיקיית תמונות');
+    let items: PhotoItem[];
+    if (g.photosAlbumUrl) items = await albumItems(g.photosAlbumUrl);
+    else if (g.photosFolderId) items = await driveItems(g.photosFolderId);
+    else throw new Error('לא הוגדר מקור תמונות (אלבום Google Photos או תיקיית Drive)');
     await fs.mkdir(photosDir(), { recursive: true });
-    const files: any[] = [];
-    let pageToken = '';
-    do {
-      const p = new URLSearchParams({
-        q: `'${g.photosFolderId}' in parents and mimeType contains 'image/' and trashed=false`,
-        fields: 'nextPageToken, files(id,name,md5Checksum,mimeType,modifiedTime)',
-        pageSize: '200',
-        supportsAllDrives: 'true',
-        includeItemsFromAllDrives: 'true',
-      });
-      if (pageToken) p.set('pageToken', pageToken);
-      const data: any = await (await gfetch(`/drive/v3/files?${p}`)).json();
-      files.push(...(data.files ?? []));
-      pageToken = data.nextPageToken ?? '';
-    } while (pageToken && files.length < 2000);
 
     const existing = new Map((await q<{ drive_id: string; md5: string; active: boolean }>('SELECT drive_id, md5, active FROM photos')).map((r) => [r.drive_id, r]));
     let added = 0;
-    for (const f of files) {
+    for (const f of items) {
       const ex = existing.get(f.id);
-      if (ex && ex.md5 === f.md5Checksum && ex.active) continue;
+      if (ex && ex.md5 === f.version && ex.active) continue;
       try {
-        const buf = Buffer.from(await (await gfetch(`/drive/v3/files/${f.id}?alt=media&supportsAllDrives=true`)).arrayBuffer());
+        const buf = await f.download();
         const out = await sharp(buf, { failOn: 'none' }).rotate().resize(1920, 1920, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
         const fileName = `${f.id}.jpg`;
         await fs.writeFile(path.join(photosDir(), fileName), out);
         await q(
           `INSERT INTO photos(drive_id, name, md5, mime, modified_time, file_name, bytes, active, synced_at) VALUES ($1,$2,$3,$4,$5,$6,$7,true,now())
            ON CONFLICT (drive_id) DO UPDATE SET name=EXCLUDED.name, md5=EXCLUDED.md5, modified_time=EXCLUDED.modified_time, file_name=EXCLUDED.file_name, bytes=EXCLUDED.bytes, active=true, synced_at=now()`,
-          [f.id, f.name, f.md5Checksum ?? null, f.mimeType, f.modifiedTime, fileName, out.length],
+          [f.id, f.name, f.version, f.mime ?? 'image/jpeg', f.modified ?? null, fileName, out.length],
         );
         added++;
       } catch (e) {
         await logError('photos', e, { file: f.name });
       }
     }
-    const live = new Set(files.map((f) => f.id));
+    const live = new Set(items.map((f) => f.id));
     let removed = 0;
     for (const [id, r] of existing) {
       if (r.active && !live.has(id)) {
@@ -257,9 +305,12 @@ export async function startPhotoScheduler() {
   const minutes = Math.max(5, g.syncMinutes || 30);
   timer = setInterval(async () => {
     try {
-      if ((await isConnected()) && (await getSettings('google')).photosFolderId) await syncPhotos();
+      const gs = await getSettings('google');
+      if (gs.photosAlbumUrl || ((await isConnected()) && gs.photosFolderId)) await syncPhotos();
     } catch (e) {
       await logError('photos-sync', e);
     }
   }, minutes * 60_000);
+  // First sync shortly after startup when a public album is configured.
+  if (g.photosAlbumUrl) setTimeout(() => syncPhotos().catch((e) => logError('photos-sync', e)), 15_000);
 }

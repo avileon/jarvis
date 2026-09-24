@@ -331,8 +331,11 @@ export function GooglePage() {
         )}
         <p className="muted small">הרשאות: קריאת מייל (ללא שליחה), יומן (קריאה + יצירת אירועים באישור), Drive לקריאה בלבד. הטוקנים נשמרים מוצפנים.</p>
       </Card>
-      <Card title="3. תיקיית תמונות" actions={<button onClick={() => g.save()}>שמור</button>}>
-        <Field label="קישור או מזהה תיקייה ב-Drive"><input value={g.draft.photosFolderId} onChange={(e) => g.set('photosFolderId', e.target.value)} placeholder="https://drive.google.com/drive/folders/..." /></Field>
+      <Card title="תמונות למצגת" actions={<button onClick={() => g.save()}>שמור</button>}>
+        <Field label="קישור לאלבום משותף ב-Google Photos (מומלץ — לא דורש חיבור Google)" hint="באפליקציית Google Photos: אלבום ← שיתוף ← יצירת קישור. תמונות חדשות באלבום יסונכרנו אוטומטית.">
+          <input value={g.draft.photosAlbumUrl ?? ''} onChange={(e) => g.set('photosAlbumUrl', e.target.value)} placeholder="https://photos.app.goo.gl/..." />
+        </Field>
+        <Field label="או: קישור/מזהה תיקייה ב-Drive (דורש חיבור Google)"><input value={g.draft.photosFolderId} onChange={(e) => g.set('photosFolderId', e.target.value)} placeholder="https://drive.google.com/drive/folders/..." /></Field>
         <Field label="סנכרון אוטומטי כל (דקות)"><Num value={g.draft.syncMinutes} min={5} onChange={(n) => g.set('syncMinutes', n)} /></Field>
         <div className="row">
           <button

@@ -50,6 +50,8 @@ export interface StationSettings {
 export interface GoogleSettings {
   clientId: string;
   photosFolderId: string;
+  /** Public shared Google Photos album link (preferred source; no OAuth). */
+  photosAlbumUrl: string;
   syncMinutes: number;
   connectedEmail: string;
   scopes: string[];
@@ -117,6 +119,7 @@ export const DEFAULTS: AllSettings = {
   google: {
     clientId: '',
     photosFolderId: '',
+    photosAlbumUrl: '',
     syncMinutes: 30,
     connectedEmail: '',
     scopes: [
