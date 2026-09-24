@@ -145,6 +145,21 @@ function Jarvis({ onUnpaired }: { onUnpaired: () => void }) {
       if (r.reply) setSubtitle((s) => (r.transcript ? `אתה: ${r.transcript}\nג׳ארביס: ${r.reply}` : `ג׳ארביס: ${r.reply}`));
       setPending(r.pendingAction ?? null);
       await playReply(r.audio, sid);
+      // Local radio command: the tablet plays the stream itself; it keeps playing through idle and the slideshow.
+      if (r.media) {
+        const radio = radioRef.current!;
+        if (r.media.action === 'play' && r.media.url) {
+          radio.src = r.media.url;
+          radio.volume = 1;
+          radio.play().catch((e) => reportError(`radio: ${e}`));
+          setSubtitle(`🎵 ${r.media.name}`);
+        } else {
+          radio.pause();
+          radio.removeAttribute('src');
+        }
+        // No follow-up listening while music plays (it would be picked up as speech).
+        return goIdle();
+      }
       if (sid !== sessionId.current) return;
       if (r.error) return goIdle();
       // "ג'ארביס לך לישון" → standby: back to the slideshow, only the wake word wakes it again.
@@ -271,6 +286,14 @@ function Jarvis({ onUnpaired }: { onUnpaired: () => void }) {
     orb.start();
     speakerRef.current = new Speaker(() => micRef.current.ctx);
     radioRef.current = new Audio();
+    // Live streams drop occasionally (network blips) — reconnect while a station is selected.
+    const retryRadio = () => {
+      const r = radioRef.current!;
+      const src = r.getAttribute('src');
+      if (src) setTimeout(() => { if (r.getAttribute('src') === src) { r.src = src; r.play().catch(() => {}); } }, 5000);
+    };
+    radioRef.current.addEventListener('error', retryRadio);
+    radioRef.current.addEventListener('ended', retryRadio);
 
     const channel = new Channel(
       (msg) => {

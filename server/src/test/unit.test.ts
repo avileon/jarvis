@@ -74,3 +74,20 @@ describe('sleep command', () => {
     expect(isSleepCommand('מה יש לי היום?')).toBe(false);
   });
 });
+
+describe('local commands', () => {
+  it('parses radio play/stop in Hebrew', async () => {
+    const { parseLocalCommand } = await import('../lib/commands.js');
+    const a = parseLocalCommand("ג'ארביס, תפעיל רדיו גלגלצ");
+    expect(a?.kind).toBe('radio-play');
+    expect(a && 'station' in a && a.station.name).toBe('גלגלצ');
+    expect((parseLocalCommand('תשים את גלי צה"ל') as any)?.station.name).toBe('גלי צה"ל');
+    expect((parseLocalCommand('תפעיל רדיו') as any)?.station.name).toBe('גלגלצ');
+    expect((parseLocalCommand('תעביר ל-103') as any)?.station.name).toBe('103FM');
+    expect(parseLocalCommand('תכבה את הרדיו')?.kind).toBe('radio-stop');
+    expect(parseLocalCommand('תפסיק את המוזיקה')?.kind).toBe('radio-stop');
+    expect(parseLocalCommand('מה השעה?')).toBe(null);
+    expect(parseLocalCommand('תדליק את האור בסלון')).toBe(null);
+    expect(parseLocalCommand('מי ניצח בשנת 1999?')).toBe(null);
+  });
+});

@@ -1,3 +1,4 @@
+import { DEFAULT_STATIONS } from './commands.js';
 import { q, q1 } from './db.js';
 import { decrypt, encrypt } from './crypto.js';
 
@@ -63,7 +64,12 @@ export interface HomeSettings {
   mqttUsername: string;
 }
 
+export interface RadioSettings {
+  stations: { name: string; aliases: string[]; url: string }[];
+}
+
 export interface AllSettings {
+  radio: RadioSettings;
   home: HomeSettings;
   ai: AiSettings;
   limits: LimitSettings;
@@ -75,6 +81,7 @@ export interface AllSettings {
 }
 
 export const DEFAULTS: AllSettings = {
+  radio: { stations: DEFAULT_STATIONS },
   home: { haUrl: '', mqttUrl: '', mqttUsername: '' },
   ai: {
     provider: 'anthropic',

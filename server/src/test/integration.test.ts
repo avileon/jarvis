@@ -292,6 +292,21 @@ describe('voice turn', () => {
   });
 });
 
+describe('local commands (no AI call)', () => {
+  it('radio play/stop and sleep bypass the model', async () => {
+    const llmCalls = mock.calls.filter((c) => c.path.startsWith('/v1/chat') || c.path.startsWith('/v1/messages')).length;
+    const a = await (await fetch(`${base}/api/chat`, { method: 'POST', headers: dev(), body: JSON.stringify({ text: "ג'ארביס, תפעיל רדיו גלגלצ", speak: true }) })).json();
+    expect(a.media.action).toBe('play');
+    expect(a.media.url).toContain('glglz');
+    expect(a.audio).toBeTruthy();
+    const b = await (await fetch(`${base}/api/chat`, { method: 'POST', headers: dev(), body: JSON.stringify({ text: 'תכבה את הרדיו' }) })).json();
+    expect(b.media.action).toBe('stop');
+    const c = await (await fetch(`${base}/api/chat`, { method: 'POST', headers: dev(), body: JSON.stringify({ text: 'לך לישון' }) })).json();
+    expect(c.sleep).toBe(true);
+    expect(mock.calls.filter((c) => c.path.startsWith('/v1/chat') || c.path.startsWith('/v1/messages')).length).toBe(llmCalls);
+  });
+});
+
 describe('limits', () => {
   it('blocks when daily cap reached', async () => {
     await fetch(`${base}/api/admin/settings/limits`, { method: 'PUT', headers: H(), body: JSON.stringify({ dailyUsd: 0.000001 }) });
