@@ -23,10 +23,11 @@ docker compose -f docker-compose.shared.yml up -d --build
 for i in $(seq 1 60); do curl -fs http://127.0.0.1:3100/api/health >/dev/null && break; sleep 2; done
 curl -fs http://127.0.0.1:3100/api/health && echo
 if ! grep -q "jarvis.vibit.co.il" /etc/caddy/Caddyfile; then
+  TMP=$(mktemp)
+  { cat /etc/caddy/Caddyfile; printf '\n'; cat caddy-site.conf; } > "$TMP"
+  caddy validate --config "$TMP" --adapter caddyfile   # abort (set -e) before touching the live file
   cp /etc/caddy/Caddyfile "/etc/caddy/Caddyfile.bak-$(date +%Y%m%d-%H%M%S)"
-  printf '\n' >> /etc/caddy/Caddyfile
-  cat caddy-site.conf >> /etc/caddy/Caddyfile
-  caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+  cat "$TMP" > /etc/caddy/Caddyfile && rm -f "$TMP"
   systemctl reload caddy
   echo "caddy reloaded"
 fi
