@@ -28,6 +28,8 @@ if ! grep -q "jarvis.vibit.co.il" /etc/caddy/Caddyfile; then
   caddy validate --config "$TMP" --adapter caddyfile   # abort (set -e) before touching the live file
   cp /etc/caddy/Caddyfile "/etc/caddy/Caddyfile.bak-$(date +%Y%m%d-%H%M%S)"
   cat "$TMP" > /etc/caddy/Caddyfile && rm -f "$TMP"
+  # validate (run as root) may create the log file root-owned; Caddy runs as user caddy.
+  chown caddy:caddy /var/log/caddy/jarvis.log 2>/dev/null || true
   systemctl reload caddy
   echo "caddy reloaded"
 fi
