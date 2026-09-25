@@ -91,3 +91,15 @@ describe('local commands', () => {
     expect(parseLocalCommand('מי ניצח בשנת 1999?')).toBe(null);
   });
 });
+
+describe('volume commands', () => {
+  it('steps volume up/down', async () => {
+    const { parseLocalCommand } = await import('../lib/commands.js');
+    expect(parseLocalCommand('תנמיך')).toMatchObject({ kind: 'volume', delta: -2 });
+    expect(parseLocalCommand("ג'ארביס, יותר חזק")).toMatchObject({ kind: 'volume', delta: 2 });
+    expect(parseLocalCommand('תגביר הרבה')).toMatchObject({ kind: 'volume', delta: 4 });
+    expect(parseLocalCommand('תוריד את הווליום')).toMatchObject({ kind: 'volume', delta: -2 });
+    expect(parseLocalCommand('תעלה את העוצמה')).toMatchObject({ kind: 'volume', delta: 2 });
+    expect(parseLocalCommand('תוריד את התריס')).toBe(null);
+  });
+});

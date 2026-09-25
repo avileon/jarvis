@@ -17,7 +17,9 @@ export class MicEngine {
     if (this.ctx) return;
     const AC: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
     this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      // Voice-processing (echo cancellation) puts Android into "call" audio mode, which pulls all sound
+      // away from Bluetooth speakers. Plain capture keeps media output on the speaker the user chose.
+      audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: true },
     });
     this.ctx = new AC();
     const src = this.ctx.createMediaStreamSource(this.stream);

@@ -21,7 +21,8 @@ export const DEFAULT_STATIONS: RadioStation[] = [
 export type LocalCommand =
   | { kind: 'sleep'; reply: string }
   | { kind: 'radio-play'; station: RadioStation; reply: string }
-  | { kind: 'radio-stop'; reply: string };
+  | { kind: 'radio-stop'; reply: string }
+  | { kind: 'volume'; delta: number; reply: string };
 
 const clean = (s: string) =>
   s
@@ -55,6 +56,16 @@ export function parseLocalCommand(text: string, stations: RadioStation[] = DEFAU
 
   if (/(^|\s)(לך|תלך|ללכת|לכי|תלכי|הולך)\s*(ל)?(ישון|לישון|שון)(\s|$)|מצב שינה|לילה טוב|תפסיק להקשיב|(^|\s)(זהו )?סיימנו(\s|$)|go to sleep/.test(t)) {
     return { kind: 'sleep', reply: 'בסדר אבי, הולך לישון. תקרא לי כשתצטרך.' };
+  }
+
+  // Volume: "תנמיך", "יותר חזק", "תעלה את הווליום", "תגביר הרבה" — one step each time.
+  const VOL_WORD = /(ה?ווליום|ה?וליום|ה?עוצמה|ה?קול|ה?רדיו|ה?מוזיקה)/;
+  const much = /(הרבה|מאוד|ממש)/.test(t) ? 2 : 1;
+  if (/(^|\s)(תנמיך|תנמיכי|הנמך|להנמיך)(\s|$)|יותר (חלש|בשקט|נמוך)|(חלש|שקט|נמוך) יותר/.test(t) || (/(^|\s)(תוריד|תורידי|הורד)(\s|$)/.test(t) && VOL_WORD.test(t))) {
+    return { kind: 'volume', delta: -2 * much, reply: '' };
+  }
+  if (/(^|\s)(תגביר|תגבירי|הגבר|להגביר|תגביה|תגביהי)(\s|$)|יותר (חזק|גבוה)|(חזק|גבוה) יותר/.test(t) || (/(^|\s)(תעלה|תעלי|העלה|תרים|תרימי)(\s|$)/.test(t) && VOL_WORD.test(t))) {
+    return { kind: 'volume', delta: 2 * much, reply: '' };
   }
 
   if (STOP.test(t) && (RADIO_WORD.test(t) || matchStation(t, stations))) {

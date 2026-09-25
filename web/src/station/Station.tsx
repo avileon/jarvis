@@ -4,6 +4,7 @@ import { MicEngine, recordUtterance, encodeWav, Speaker, b64ToBlob } from './aud
 import { api, AuthError, Channel, getToken, pair, reportError, setToken } from './client';
 import { localIndex, photoUrl, syncPhotos, type PhotoRef } from './photos';
 import type { WakeWordDetector } from './wakeword';
+import { Radio } from './media';
 import './station.css';
 
 interface StationConfig {
@@ -73,7 +74,7 @@ function Jarvis({ onUnpaired }: { onUnpaired: () => void }) {
   const orbRef = useRef<Orb | null>(null);
   const micRef = useRef(new MicEngine());
   const speakerRef = useRef<Speaker | null>(null);
-  const radioRef = useRef<HTMLAudioElement | null>(null);
+  const radioRef = useRef<Radio | null>(null);
   const wakeRef = useRef<WakeWordDetector | null>(null);
   const channelRef = useRef<Channel | null>(null);
   const cfgRef = useRef<StationConfig>(DEFAULT_CFG);
@@ -108,8 +109,7 @@ function Jarvis({ onUnpaired }: { onUnpaired: () => void }) {
     setOrbState(s);
     setStatus(label ?? LABELS[s]);
     channelRef.current?.send({ type: 'state', state: s });
-    const radio = radioRef.current;
-    if (radio) radio.volume = s === 'idle' ? 1 : 0.15;
+    radioRef.current?.duck(s !== 'idle');
   }, []);
 
   const setView = useCallback((v: 'slideshow' | 'jarvis') => {
@@ -149,13 +149,13 @@ function Jarvis({ onUnpaired }: { onUnpaired: () => void }) {
       if (r.media) {
         const radio = radioRef.current!;
         if (r.media.action === 'play' && r.media.url) {
-          radio.src = r.media.url;
-          radio.volume = 1;
-          radio.play().catch((e) => reportError(`radio: ${e}`));
+          radio.play(r.media.url, r.media.name);
           setSubtitle(`🎵 ${r.media.name}`);
+        } else if (r.media.action === 'volume') {
+          const pct = radio.step(r.media.delta);
+          setSubtitle(`🔊 ${pct}%`);
         } else {
-          radio.pause();
-          radio.removeAttribute('src');
+          radio.stop();
         }
         // No follow-up listening while music plays (it would be picked up as speech).
         return goIdle();
@@ -285,15 +285,7 @@ function Jarvis({ onUnpaired }: { onUnpaired: () => void }) {
     orbRef.current = orb;
     orb.start();
     speakerRef.current = new Speaker(() => micRef.current.ctx);
-    radioRef.current = new Audio();
-    // Live streams drop occasionally (network blips) — reconnect while a station is selected.
-    const retryRadio = () => {
-      const r = radioRef.current!;
-      const src = r.getAttribute('src');
-      if (src) setTimeout(() => { if (r.getAttribute('src') === src) { r.src = src; r.play().catch(() => {}); } }, 5000);
-    };
-    radioRef.current.addEventListener('error', retryRadio);
-    radioRef.current.addEventListener('ended', retryRadio);
+    radioRef.current = new Radio((m) => reportError(m));
 
     const channel = new Channel(
       (msg) => {
@@ -302,7 +294,7 @@ function Jarvis({ onUnpaired }: { onUnpaired: () => void }) {
             // New server build deployed → reload the UI (no APK reinstall needed).
             if (msg.buildId && msg.buildId !== 'dev') {
               if (buildRef.current && buildRef.current !== msg.buildId) {
-                const tryReload = () => (stateRef.current === 'idle' ? location.reload() : setTimeout(tryReload, 5000));
+                const tryReload = () => (stateRef.current === 'idle' && !(radioRef.current?.playing && !radioRef.current.isNative) ? location.reload() : setTimeout(tryReload, 15000));
                 tryReload();
               }
               buildRef.current = msg.buildId;
@@ -322,13 +314,8 @@ function Jarvis({ onUnpaired }: { onUnpaired: () => void }) {
             syncPhotos().then(setPhotos).catch(() => {});
             break;
           case 'media':
-            if (msg.action === 'play' && msg.url) {
-              radioRef.current!.src = msg.url;
-              radioRef.current!.play().catch((e) => reportError(`radio: ${e}`));
-            } else {
-              radioRef.current!.pause();
-              radioRef.current!.removeAttribute('src');
-            }
+            if (msg.action === 'play' && msg.url) radioRef.current!.play(msg.url, msg.name);
+            else radioRef.current!.stop();
             break;
           case 'command':
             if (msg.command === 'reload') location.reload();

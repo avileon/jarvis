@@ -50,6 +50,20 @@ class MainActivity : Activity() {
     private var lastTap = 0L
 
     private val prefs by lazy { getSharedPreferences("jarvis", Context.MODE_PRIVATE) }
+    private val radio by lazy { RadioPlayer(this) }
+    private val audioManager by lazy { getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager }
+
+    /** WebView's microphone capture may switch Android into "call" mode, which pulls sound off
+     *  Bluetooth speakers. Keep the device in normal media mode so output follows the chosen speaker. */
+    private val keepMediaMode = object : Runnable {
+        override fun run() {
+            runCatching {
+                if (audioManager.mode != android.media.AudioManager.MODE_NORMAL) audioManager.mode = android.media.AudioManager.MODE_NORMAL
+                if (audioManager.isSpeakerphoneOn) audioManager.isSpeakerphoneOn = false
+            }
+            handler.postDelayed(this, 2000)
+        }
+    }
     private val serverUrl: String get() = prefs.getString("url", BuildConfig.DEFAULT_URL) ?: BuildConfig.DEFAULT_URL
 
     private val powerReceiver = object : BroadcastReceiver() {
@@ -71,6 +85,8 @@ class MainActivity : Activity() {
         })
         updateKeepScreenOn()
         watchNetwork()
+        volumeControlStream = android.media.AudioManager.STREAM_MUSIC
+        handler.post(keepMediaMode)
         if (prefs.getString("url", null) == null) promptServerUrl(first = true) else web.loadUrl(serverUrl)
     }
 
@@ -261,6 +277,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        handler.removeCallbacks(keepMediaMode)
+        radio.stop()
         runCatching { unregisterReceiver(powerReceiver) }
         networkCallback?.let { runCatching { (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager).unregisterNetworkCallback(it) } }
         web.destroy()
@@ -275,6 +293,21 @@ class MainActivity : Activity() {
             put("sdk", Build.VERSION.SDK_INT)
             put("app", BuildConfig.VERSION_NAME)
         }.toString()
+
+        @JavascriptInterface
+        fun radioPlay(url: String) { runOnUiThread { radio.play(url) } }
+
+        @JavascriptInterface
+        fun radioStop() { runOnUiThread { radio.stop() } }
+
+        @JavascriptInterface
+        fun radioDuck(on: Boolean) { runOnUiThread { radio.duck(on) } }
+
+        @JavascriptInterface
+        fun volumeStep(delta: Int): Int = radio.volumeStep(delta)
+
+        @JavascriptInterface
+        fun volumeGet(): Int = radio.volumePercent()
 
         @JavascriptInterface
         fun saveToken(token: String) {

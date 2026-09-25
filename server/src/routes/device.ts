@@ -23,20 +23,27 @@ async function localCommand(text: string, wantAudio: boolean) {
   const cmd = parseLocalCommand(text, radio.stations);
   if (!cmd) return null;
   let audio: string | null = null;
-  if (wantAudio) {
+  if (wantAudio && cmd.reply) {
     try {
       audio = (await fs.promises.readFile((await synthesizeCached(cmd.reply)).file)).toString('base64');
     } catch (e) {
       await logError('tts', e);
     }
   }
-  await logAction('user', `local:${cmd.kind}`, cmd.kind === 'radio-play' ? `רדיו: ${cmd.station.name}` : cmd.reply);
+  await logAction('user', `local:${cmd.kind}`, cmd.kind === 'radio-play' ? `רדיו: ${cmd.station.name}` : cmd.kind === 'volume' ? `ווליום ${cmd.delta > 0 ? '+' : ''}${cmd.delta}` : cmd.reply);
   return {
     reply: cmd.reply,
     audio,
     local: true,
     sleep: cmd.kind === 'sleep' || undefined,
-    media: cmd.kind === 'radio-play' ? { action: 'play', url: cmd.station.url, name: cmd.station.name } : cmd.kind === 'radio-stop' ? { action: 'stop' } : undefined,
+    media:
+      cmd.kind === 'radio-play'
+        ? { action: 'play', url: cmd.station.url, name: cmd.station.name }
+        : cmd.kind === 'radio-stop'
+          ? { action: 'stop' }
+          : cmd.kind === 'volume'
+            ? { action: 'volume', delta: cmd.delta }
+            : undefined,
   };
 }
 
