@@ -181,6 +181,12 @@ export function AiPage() {
         <SecretInput name="openai_api_key" label="OpenAI API key" isSet={ai.secrets?.openai_api_key} onSaved={ai.reload} hint="משמש גם לזיהוי דיבור בעברית (gpt-4o-transcribe)" />
       </Card>
       <Card title="מודל ושיחה" actions={<><span className="ok">{ai.msg}</span><button onClick={() => ai.save()}>שמור</button></>}>
+        <Field label="מצב פעולה" hint="פקודות בלבד = רדיו, ווליום ושינה עובדים; כל בקשה אחרת מקבלת תשובה קבועה, בלי קריאה למודל AI (בלי עלות מודל). זיהוי הדיבור עדיין נחוץ (~0.02 אגורה לפקודה).">
+          <select value={ai.draft.mode ?? 'full'} onChange={(e) => ai.set('mode', e.target.value)}>
+            <option value="full">מלא — עונה על הכל עם AI</option>
+            <option value="commands">פקודות בלבד — בלי AI</option>
+          </select>
+        </Field>
         <div className="grid2">
           <Field label="ספק">
             <select value={ai.draft.provider} onChange={(e) => ai.set('provider', e.target.value)}>

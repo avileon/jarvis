@@ -3,6 +3,8 @@ import { q, q1 } from './db.js';
 import { decrypt, encrypt } from './crypto.js';
 
 export interface AiSettings {
+  /** 'full' = AI model answers anything; 'commands' = only built-in commands, no AI model calls (no LLM cost). */
+  mode: 'full' | 'commands';
   provider: 'anthropic' | 'openai';
   model: string;
   temperature: number;
@@ -84,6 +86,7 @@ export const DEFAULTS: AllSettings = {
   radio: { stations: DEFAULT_STATIONS },
   home: { haUrl: '', mqttUrl: '', mqttUsername: '' },
   ai: {
+    mode: 'full',
     provider: 'anthropic',
     model: 'claude-sonnet-4-5',
     temperature: 0.6,

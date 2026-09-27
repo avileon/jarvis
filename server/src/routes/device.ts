@@ -47,6 +47,21 @@ async function localCommand(text: string, wantAudio: boolean) {
   };
 }
 
+const NOT_TAUGHT = 'את זה עוד לא לימדו אותי. אני יודע להפעיל רדיו, לשנות ווליום וללכת לישון.';
+/** Commands-only mode: anything that isn't a built-in command gets a fixed (cached, free) reply — no AI model call. */
+async function commandsOnlyReply(wantAudio: boolean) {
+  if ((await getSettings('ai')).mode !== 'commands') return null;
+  let audio: string | null = null;
+  if (wantAudio) {
+    try {
+      audio = (await fs.promises.readFile((await synthesizeCached(NOT_TAUGHT)).file)).toString('base64');
+    } catch (e) {
+      await logError('tts', e);
+    }
+  }
+  return { reply: NOT_TAUGHT, audio, local: true };
+}
+
 let buildId = '';
 function webBuildId() {
   if (!buildId) {
@@ -129,6 +144,8 @@ export async function deviceRoutes(app: FastifyInstance) {
       if (!transcript || transcript.replace(/[\s.,!?]/g, '').length < 2) return { transcript: '', reply: '', audio: null, empty: true };
       const local = await localCommand(transcript, true);
       if (local) return { transcript, ...local };
+      const off = await commandsOnlyReply(true);
+      if (off) return { transcript, ...off };
       const r = await runTurn({ text: transcript, deviceId: req.deviceId, emit });
       return { transcript, reply: r.reply, audio: await speakable(r.reply, true), pendingAction: r.pendingAction ?? null, actions: r.actions };
     } catch (e) {
@@ -145,6 +162,8 @@ export async function deviceRoutes(app: FastifyInstance) {
       emit({ type: 'status', state: 'processing' });
       const local = await localCommand(body.text, body.speak);
       if (local) return local;
+      const off = await commandsOnlyReply(body.speak);
+      if (off) return off;
       const r = await runTurn({ text: body.text, deviceId: req.deviceId, emit });
       return { reply: r.reply, audio: await speakable(r.reply, body.speak), pendingAction: r.pendingAction ?? null, actions: r.actions, conversationId: r.conversationId };
     } catch (e) {

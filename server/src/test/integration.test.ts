@@ -307,6 +307,19 @@ describe('local commands (no AI call)', () => {
   });
 });
 
+describe('commands-only mode', () => {
+  it('answers non-commands with a fixed reply and no AI call', async () => {
+    await fetch(`${base}/api/admin/settings/ai`, { method: 'PUT', headers: H(), body: JSON.stringify({ mode: 'commands' }) });
+    const before = mock.calls.filter((c) => c.path.startsWith('/v1/chat') || c.path.startsWith('/v1/messages')).length;
+    const r = await (await fetch(`${base}/api/chat`, { method: 'POST', headers: dev(), body: JSON.stringify({ text: 'מה מזג האוויר?' }) })).json();
+    expect(r.reply).toContain('לא לימדו אותי');
+    const radio = await (await fetch(`${base}/api/chat`, { method: 'POST', headers: dev(), body: JSON.stringify({ text: 'תפעיל גלגלצ' }) })).json();
+    expect(radio.media.action).toBe('play');
+    expect(mock.calls.filter((c) => c.path.startsWith('/v1/chat') || c.path.startsWith('/v1/messages')).length).toBe(before);
+    await fetch(`${base}/api/admin/settings/ai`, { method: 'PUT', headers: H(), body: JSON.stringify({ mode: 'full' }) });
+  });
+});
+
 describe('limits', () => {
   it('blocks when daily cap reached', async () => {
     await fetch(`${base}/api/admin/settings/limits`, { method: 'PUT', headers: H(), body: JSON.stringify({ dailyUsd: 0.000001 }) });
