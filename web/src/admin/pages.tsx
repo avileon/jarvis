@@ -279,7 +279,14 @@ export function VoicePage() {
         <div className="grid3">
           <Field label="תגובה למילת ההפעלה"><input value={v.draft.ackPhrase} onChange={(e) => v.set('ackPhrase', e.target.value)} /></Field>
           <Field label="המשך האזנה אחרי תשובה (שניות)" hint="שאלות המשך בלי 'היי ג׳ארביס'. 0 = כבוי"><Num value={v.draft.followUpSeconds} min={0} max={30} onChange={(n) => v.set('followUpSeconds', n)} /></Field>
-          <Field label="מודל זיהוי דיבור"><input value={v.draft.sttModel} onChange={(e) => v.set('sttModel', e.target.value)} /></Field>
+          <Field label="זיהוי דיבור" hint="אוטומטי = זיהוי הדיבור של גוגל שמובנה בטאבלט (חינם). אם אינו זמין — OpenAI בשרת.">
+            <select value={v.draft.sttEngine ?? 'auto'} onChange={(e) => v.set('sttEngine', e.target.value)}>
+              <option value="auto">אוטומטי (טאבלט, חינם)</option>
+              <option value="device">טאבלט בלבד</option>
+              <option value="server">שרת (OpenAI, בתשלום)</option>
+            </select>
+          </Field>
+          <Field label="מודל זיהוי דיבור בשרת"><input value={v.draft.sttModel} onChange={(e) => v.set('sttModel', e.target.value)} /></Field>
         </div>
       </Card>
       <Card title='מילת הפעלה "היי ג׳ארביס"' actions={<><span className="ok">{w.msg}</span><button onClick={() => w.save()}>שמור</button></>}>

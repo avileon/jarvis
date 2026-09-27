@@ -10,6 +10,12 @@
     <!-- Lets the app bring itself to the front after boot on Android 10+ (user grants it in settings). -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"

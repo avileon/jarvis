@@ -5,12 +5,13 @@ import { api, AuthError, Channel, getToken, pair, reportError, setToken } from '
 import { localIndex, photoUrl, syncPhotos, type PhotoRef } from './photos';
 import type { WakeWordDetector } from './wakeword';
 import { Radio } from './media';
+import { deviceListen, deviceSttAvailable } from './deviceSpeech';
 import './station.css';
 
 interface StationConfig {
   station: { slideshowSeconds: number; idleReturnSeconds: number; showClock: boolean; orbQuality: 'auto' | 'low' | 'high' };
   wake: { enabled: boolean; threshold: number; patience: number };
-  voice: { ackPhrase: string; followUpSeconds: number };
+  voice: { ackPhrase: string; followUpSeconds: number; sttEngine?: 'auto' | 'device' | 'server' };
 }
 
 const DEFAULT_CFG: StationConfig = {
@@ -85,6 +86,7 @@ function Jarvis({ onUnpaired }: { onUnpaired: () => void }) {
   const ackBlob = useRef<Blob | null>(null);
   const sessionId = useRef(0);
   const buildRef = useRef('');
+  const nativeLevel = useRef(-1);
 
   const [started, setStarted] = useState(false);
   const [view, setViewState] = useState<'slideshow' | 'jarvis'>('jarvis');
@@ -195,10 +197,58 @@ function Jarvis({ onUnpaired }: { onUnpaired: () => void }) {
     [handleResult, setState, goIdle, onUnpaired],
   );
 
+  /** Text recognized on the tablet → server (no audio upload, no STT cost). */
+  const sendTranscript = useCallback(
+    async (text: string, sid: number) => {
+      setSubtitle(`אתה: ${text}`);
+      setState('processing');
+      try {
+        const r = await api('/api/chat', { method: 'POST', body: JSON.stringify({ text, speak: true }) });
+        await handleResult({ ...r, transcript: text }, sid);
+      } catch (e) {
+        if (e instanceof AuthError) return onUnpaired();
+        setState('error', 'לא הצלחתי להגיע לשרת');
+        setTimeout(goIdle, 2500);
+      }
+    },
+    [handleResult, setState, goIdle, onUnpaired],
+  );
+
+  const useDeviceStt = () => {
+    const e = cfgRef.current.voice.sttEngine ?? 'auto';
+    return e !== 'server' && deviceSttAvailable();
+  };
+
   const listen = useCallback(
     (startTimeoutMs: number, sid: number) => {
       if (sid !== sessionId.current) return;
       setState('listening');
+      if (useDeviceStt()) {
+        // Free on-device Google recognition: release our mic so the recognizer can use it.
+        micRef.current.stop();
+        nativeLevel.current = 0;
+        const rec = deviceListen({
+          timeoutMs: startTimeoutMs + 15000,
+          onStart: () => { touch(); setStatus('מקשיב לך…'); },
+          onLevel: (v) => (nativeLevel.current = v),
+          onPartial: (t) => setSubtitle(`אתה: ${t}…`),
+        });
+        cancelRec.current = rec.cancel;
+        rec.promise.then(async ({ text, error }) => {
+          cancelRec.current = null;
+          nativeLevel.current = -1;
+          await micRef.current.start().catch((e) => reportError(`mic restart: ${e}`));
+          wakeRef.current?.reset();
+          if (sid !== sessionId.current) return;
+          if (!text) {
+            if (error !== undefined && ![-2, 6, 7].includes(error)) reportError(`device stt error ${error}`);
+            return goIdle();
+          }
+          touch();
+          sendTranscript(text, sid);
+        });
+        return;
+      }
       const rec = recordUtterance(micRef.current, { startTimeoutMs, onSpeechStart: () => { touch(); setStatus('מקשיב לך…'); } });
       cancelRec.current = rec.cancel;
       rec.promise.then((samples) => {
@@ -209,7 +259,7 @@ function Jarvis({ onUnpaired }: { onUnpaired: () => void }) {
         sendAudio(samples, sid);
       });
     },
-    [setState, goIdle, sendAudio],
+    [setState, goIdle, sendAudio, sendTranscript],
   );
 
   const wake = useCallback(
@@ -279,12 +329,12 @@ function Jarvis({ onUnpaired }: { onUnpaired: () => void }) {
     const orb = new Orb(canvasRef.current!, 'auto', () => {
       const s = stateRef.current;
       if (s === 'speaking') return speakerRef.current?.level() ?? 0;
-      if (s === 'listening' || s === 'wake') return micRef.current.level;
+      if (s === 'listening' || s === 'wake') return nativeLevel.current >= 0 ? nativeLevel.current : micRef.current.level;
       return 0;
     });
     orbRef.current = orb;
     orb.start();
-    speakerRef.current = new Speaker(() => micRef.current.ctx);
+    speakerRef.current = new Speaker();
     radioRef.current = new Radio((m) => reportError(m));
 
     const channel = new Channel(

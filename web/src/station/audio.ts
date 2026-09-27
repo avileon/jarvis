@@ -164,13 +164,23 @@ export class Speaker {
   private data: Uint8Array | null = null;
   private url = '';
 
-  constructor(private ctx: () => AudioContext | null) {
+  private ownCtx: AudioContext | null = null;
+
+  /** Uses its own AudioContext so playback keeps working while the microphone is released. */
+  constructor(_legacy?: unknown) {
     this.audio.preload = 'auto';
   }
 
   private ensureGraph() {
-    const ctx = this.ctx();
-    if (!ctx || this.analyser) return;
+    if (this.analyser) return;
+    const AC: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
+    try {
+      this.ownCtx ??= new AC();
+      this.ownCtx.resume().catch(() => {});
+    } catch {
+      return;
+    }
+    const ctx = this.ownCtx;
     try {
       const src = ctx.createMediaElementSource(this.audio);
       this.analyser = ctx.createAnalyser();

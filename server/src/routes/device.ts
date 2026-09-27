@@ -76,7 +76,7 @@ function webBuildId() {
 
 export async function stationConfig() {
   const [station, wake, voice] = await Promise.all([getSettings('station'), getSettings('wake'), getSettings('voice')]);
-  return { station, wake, voice: { ackPhrase: voice.ackPhrase, followUpSeconds: voice.followUpSeconds }, buildId: webBuildId() };
+  return { station, wake, voice: { ackPhrase: voice.ackPhrase, followUpSeconds: voice.followUpSeconds, sttEngine: voice.sttEngine }, buildId: webBuildId() };
 }
 
 function emitter(deviceId?: string) {

@@ -26,6 +26,8 @@ export interface PricingSettings {
   tts: Record<string, number>;
 }
 export interface VoiceSettings {
+  /** auto = tablet's built-in Google recognizer when available (free), else server STT. */
+  sttEngine: 'auto' | 'device' | 'server';
   sttModel: string;
   ttsProvider: 'azure' | 'openai';
   azureRegion: string;
@@ -112,6 +114,7 @@ export const DEFAULTS: AllSettings = {
     tts: { azure: 16, 'gpt-4o-mini-tts': 12, 'tts-1': 15, default: 16 },
   },
   voice: {
+    sttEngine: 'auto',
     sttModel: 'gpt-4o-transcribe',
     ttsProvider: 'azure',
     azureRegion: 'westeurope',

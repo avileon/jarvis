@@ -51,6 +51,7 @@ class MainActivity : Activity() {
 
     private val prefs by lazy { getSharedPreferences("jarvis", Context.MODE_PRIVATE) }
     private val radio by lazy { RadioPlayer(this) }
+    private val speech by lazy { DeviceSpeech(this) { web } }
     private val audioManager by lazy { getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager }
 
     /** WebView's microphone capture may switch Android into "call" mode, which pulls sound off
@@ -278,6 +279,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         handler.removeCallbacks(keepMediaMode)
+        speech.cancel()
         radio.stop()
         runCatching { unregisterReceiver(powerReceiver) }
         networkCallback?.let { runCatching { (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager).unregisterNetworkCallback(it) } }
@@ -293,6 +295,15 @@ class MainActivity : Activity() {
             put("sdk", Build.VERSION.SDK_INT)
             put("app", BuildConfig.VERSION_NAME)
         }.toString()
+
+        @JavascriptInterface
+        fun speechAvailable(): Boolean = speech.available()
+
+        @JavascriptInterface
+        fun speechListen(language: String) { runOnUiThread { speech.listen(language.ifBlank { "he-IL" }) } }
+
+        @JavascriptInterface
+        fun speechCancel() { runOnUiThread { speech.cancel() } }
 
         @JavascriptInterface
         fun radioPlay(url: String) { runOnUiThread { radio.play(url) } }
