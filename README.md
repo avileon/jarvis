@@ -22,6 +22,7 @@ Tablet (Android shell → WebView)          Server (Docker Compose)
 | `server/` | TypeScript backend. `src/ai` agent loop + providers, `src/voice` STT/TTS, `src/google`, `src/home`, `src/tools` (functions the model may call), `src/routes` |
 | `web/` | React app: `/` = tablet station, `/admin` = admin panel. `public/wakeword` = openWakeWord ONNX models |
 | `android/` | Kotlin WebView kiosk shell (fullscreen, mic, keep-screen-on while charging, reconnect, boot start) |
+| `phone/` | **JARVIS phone assistant** — standalone offline Android app (default digital assistant, Hebrew commands, contact dialing, wake word). See [`phone/README.md`](phone/README.md) |
 | `deploy/` | `docker-compose.yml`, `Caddyfile`, `install.sh` (bootstrap), `update.sh`, PM2 alternative |
 
 ## Install (fresh Ubuntu server)
