@@ -6,6 +6,13 @@
 
 > זה פרויקט נפרד מאפליקציית הטאבלט (`android/`). הוא נמצא בתיקייה `phone/`.
 
+<p>
+<img src="docs/screenshots/main.jpg" width="180" alt="מסך ראשי">
+<img src="docs/screenshots/conversation.jpg" width="180" alt="שיחה">
+<img src="docs/screenshots/overlay_locked.jpg" width="180" alt="חלונית מעל מסך נעול">
+<img src="docs/screenshots/settings.jpg" width="180" alt="הגדרות">
+</p>
+
 ---
 
 ## 1. התקנה מהירה (APK)
