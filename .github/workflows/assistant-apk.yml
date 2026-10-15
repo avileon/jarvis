@@ -1,0 +1,50 @@
+name: JARVIS Assistant APK
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/jarvis-ai-android-*", main]
+    paths: ["phone/**", ".github/workflows/assistant-apk.yml"]
+    tags: ["assistant-v*"]
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: 17 }
+      # Runner image ships the Android SDK (ANDROID_HOME) with licenses accepted.
+      - run: echo "sdk.dir=$ANDROID_HOME" > phone/local.properties
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests (core NLU / contact matching / dialog)
+        working-directory: phone
+        run: ./gradlew :core:test --no-daemon --stacktrace
+      - name: Build APKs
+        working-directory: phone
+        env:
+          # Personal sideload key kept in this private repo so every build can update the installed app.
+          JARVIS_ASSISTANT_KEYSTORE: ${{ github.workspace }}/phone/jarvis-assistant.jks
+          JARVIS_ASSISTANT_KEYSTORE_PASSWORD: jarvis-assistant-sideload
+        run: |
+          ./gradlew :app:assembleRelease :app:lintRelease --no-daemon --stacktrace \
+            -PjarvisVersionCode=${{ github.run_number }} -PjarvisVersionName="1.0.${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk ../jarvis-assistant.apk
+      - name: Inspect APK
+        run: |
+          ls -la jarvis-assistant.apk
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          $BT/aapt2 dump badging jarvis-assistant.apk | head -30
+          $BT/apksigner verify --print-certs jarvis-assistant.apk | head -5
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jarvis-assistant-apk
+          path: |
+            jarvis-assistant.apk
+            phone/app/build/reports/lint-results-release.html
+            phone/core/build/reports/tests/
+          if-no-files-found: warn
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with: { files: jarvis-assistant.apk }

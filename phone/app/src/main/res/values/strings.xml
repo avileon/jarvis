@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">JARVIS</string>
+    <string name="channel_listening">האזנה למילת הפעלה</string>
+    <string name="channel_alerts">התראות ג׳ארביס</string>
+</resources>

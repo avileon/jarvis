@@ -11,3 +11,4 @@ android/local.properties
 *.keystore
 *.jks
 !android/jarvis-station.jks
+!phone/jarvis-assistant.jks
