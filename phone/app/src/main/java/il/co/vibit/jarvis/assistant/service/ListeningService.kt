@@ -192,7 +192,9 @@ class ListeningService : LifecycleService() {
          * notification is an allowed trigger, so we offer one.
          */
         fun postResumeNotification(context: Context) {
-            if (context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+            if (android.os.Build.VERSION.SDK_INT >= 33 &&
+                context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            ) return
             val resume = PendingIntent.getForegroundService(
                 context, 2, Intent(context, ListeningService::class.java).setAction(ACTION_RESUME), PendingIntent.FLAG_IMMUTABLE,
             )

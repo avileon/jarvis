@@ -5,6 +5,7 @@ import android.app.Application
 import android.app.role.RoleManager
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.PowerManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -70,7 +71,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 mic = granted(Manifest.permission.RECORD_AUDIO),
                 contacts = granted(Manifest.permission.READ_CONTACTS),
                 call = granted(Manifest.permission.CALL_PHONE),
-                notifications = granted(Manifest.permission.POST_NOTIFICATIONS),
+                notifications = Build.VERSION.SDK_INT < 33 || granted(Manifest.permission.POST_NOTIFICATIONS),
             ),
         )
         app.contacts.invalidate()

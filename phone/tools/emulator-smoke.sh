@@ -50,7 +50,8 @@ call_check() { # $1 = expected number
 }
 say() { # typed command into the engine, then wait for TTS/turn
   echo ">>> user: $1"
-  bc COMMAND --es text "$1"
+  # adb shell re-joins arguments for the device shell: quote so the whole sentence arrives.
+  bc COMMAND --es text "'$1'"
   sleep "${2:-7}"
 }
 
@@ -129,16 +130,26 @@ adb shell dumpsys activity services $PKG/.service.ListeningService | grep -E "is
 applog | grep -E "WakeWord|listener error|AudioRecord" | tail -5 | sed 's/^/  /'
 adb shell input keyevent KEYCODE_WAKEUP; adb shell wm dismiss-keyguard; sleep 2
 
-section "assistant overlay (system session)"
+section "assistant overlay (system session, via the assist key)"
 adb logcat -c
-adb shell cmd voiceinteraction show; sleep 4
+adb shell input keyevent KEYCODE_ASSIST; sleep 4
+texts
+if grep -q "J.A.R.V.I.S" /tmp/ui.xml; then pass "assist key opens the JARVIS overlay"; else fail "overlay not shown"; fi
+say "מה השעה" 6
 texts
 shot overlay
-if grep -q "J.A.R.V.I.S" /tmp/ui.xml; then pass "assist session overlay shown"; else
-  adb shell input keyevent KEYCODE_ASSIST; sleep 4; texts
-  if grep -q "J.A.R.V.I.S" /tmp/ui.xml; then pass "assist overlay via KEYCODE_ASSIST"; else fail "overlay not shown"; fi
-fi
+applog | grep "turn user=" | sed 's/^/  /'
 adb shell input keyevent KEYCODE_BACK; sleep 1
+
+section "overlay over the lock screen"
+adb shell input keyevent KEYCODE_SLEEP; sleep 2; adb shell input keyevent KEYCODE_WAKEUP; sleep 2
+adb shell dumpsys window | grep -E "mDreamingLockscreen|isKeyguardShowing|mShowingLockscreen" | head -3 | sed 's/^/  /'
+adb shell input keyevent KEYCODE_ASSIST; sleep 4
+texts
+shot overlay_locked
+if grep -q "J.A.R.V.I.S" /tmp/ui.xml; then pass "overlay shown while locked"; else fail "overlay not shown while locked"; fi
+adb shell input keyevent KEYCODE_BACK; sleep 1
+adb shell wm dismiss-keyguard; sleep 1
 
 section "settings screen"
 adb shell am start -n $PKG/.ui.MainActivity >/dev/null; sleep 3
