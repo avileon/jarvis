@@ -127,8 +127,10 @@ class AssistantEngine(
     /** Returns recognised text ("" if nothing was said), or null if recognition is impossible (already reported). */
     private suspend fun listen(): String? {
         val s = settings.current
-        if (s.earcon) beep()
+        // Switch phase first: the wake word service observes it and releases the microphone.
         _state.update { it.copy(phase = Phase.LISTENING, partial = "", level = 0f) }
+        delay(60)
+        if (s.earcon) beep()
         stt.biasingStrings = contacts.load()?.map { it.displayName }.orEmpty()
         val result = stt.listen(s.sttLanguage, s.preferOnDeviceStt, s.allowOnlineStt) { ev ->
             when (ev) {

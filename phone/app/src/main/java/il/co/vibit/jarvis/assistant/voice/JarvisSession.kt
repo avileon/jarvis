@@ -41,9 +41,10 @@ class JarvisSession(context: Context) : VoiceInteractionSession(context), Lifecy
     private var autoHide: Job? = null
 
     override fun onCreate() {
-        super.onCreate()
+        // Owners must be ready before super.onCreate(), which calls onCreateContentView().
         savedState.performRestore(null)
         registry.currentState = Lifecycle.State.CREATED
+        super.onCreate()
         scope.launch {
             app.engine.events.collect { ev ->
                 when (ev) {
