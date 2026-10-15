@@ -141,15 +141,23 @@ shot overlay
 applog | grep "turn user=" | sed 's/^/  /'
 adb shell input keyevent KEYCODE_BACK; sleep 1
 
-section "overlay over the lock screen"
+section "locked phone (PIN), screen off"
+adb shell locksettings set-pin 1357 >/dev/null
+adb shell input keyevent KEYCODE_SLEEP; sleep 3
+adb logcat -c
+say "ג׳ארביס, תחייגי לבר" 8
+if applog | grep -q "call 0522222222 -> PLACED"; then pass "call placed while locked with screen off"; else fail "no call while locked"; fi
+adb shell dumpsys telecom | grep -m1 -E "Call id=TC" | sed 's/^/  telecom: /'
+adb shell input keyevent KEYCODE_ENDCALL; sleep 2
 adb shell input keyevent KEYCODE_SLEEP; sleep 2; adb shell input keyevent KEYCODE_WAKEUP; sleep 2
-adb shell dumpsys window | grep -E "mDreamingLockscreen|isKeyguardShowing|mShowingLockscreen" | head -3 | sed 's/^/  /'
+adb shell dumpsys window | grep -m1 -E "isKeyguardShowing|mKeyguardShowing|keyguardShowing" | sed 's/^/  /'
 adb shell input keyevent KEYCODE_ASSIST; sleep 4
 texts
 shot overlay_locked
-if grep -q "J.A.R.V.I.S" /tmp/ui.xml; then pass "overlay shown while locked"; else fail "overlay not shown while locked"; fi
+if grep -q "J.A.R.V.I.S" /tmp/ui.xml; then pass "overlay shown over the PIN lock screen"; else fail "overlay not shown while locked"; fi
 adb shell input keyevent KEYCODE_BACK; sleep 1
-adb shell wm dismiss-keyguard; sleep 1
+adb shell locksettings clear --old 1357 >/dev/null
+adb shell input keyevent KEYCODE_WAKEUP; adb shell wm dismiss-keyguard; sleep 2
 
 section "settings screen"
 adb shell am start -n $PKG/.ui.MainActivity >/dev/null; sleep 3
