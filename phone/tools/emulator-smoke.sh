@@ -132,12 +132,11 @@ adb shell input keyevent KEYCODE_WAKEUP; adb shell wm dismiss-keyguard; sleep 2
 
 section "assistant overlay (system session, via the assist key)"
 adb logcat -c
-adb shell input keyevent KEYCODE_ASSIST; sleep 4
+adb shell input keyevent KEYCODE_ASSIST; sleep 1.5
+shot overlay
 texts
 if grep -q "J.A.R.V.I.S" /tmp/ui.xml; then pass "assist key opens the JARVIS overlay"; else fail "overlay not shown"; fi
 say "מה השעה" 6
-texts
-shot overlay
 applog | grep "turn user=" | sed 's/^/  /'
 adb shell input keyevent KEYCODE_BACK; sleep 1
 
@@ -151,9 +150,9 @@ adb shell dumpsys telecom | grep -m1 -E "Call id=TC" | sed 's/^/  telecom: /'
 adb shell input keyevent KEYCODE_ENDCALL; sleep 2
 adb shell input keyevent KEYCODE_SLEEP; sleep 2; adb shell input keyevent KEYCODE_WAKEUP; sleep 2
 adb shell dumpsys window | grep -m1 -E "isKeyguardShowing|mKeyguardShowing|keyguardShowing" | sed 's/^/  /'
-adb shell input keyevent KEYCODE_ASSIST; sleep 4
-texts
+adb shell input keyevent KEYCODE_ASSIST; sleep 1.5
 shot overlay_locked
+texts
 if grep -q "J.A.R.V.I.S" /tmp/ui.xml; then pass "overlay shown over the PIN lock screen"; else fail "overlay not shown while locked"; fi
 adb shell input keyevent KEYCODE_BACK; sleep 1
 adb shell locksettings clear --old 1357 >/dev/null
