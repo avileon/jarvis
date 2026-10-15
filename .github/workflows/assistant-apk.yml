@@ -30,6 +30,8 @@ jobs:
           ./gradlew :app:assembleRelease :app:lintRelease --no-daemon --stacktrace \
             -PjarvisVersionCode=${{ github.run_number }} -PjarvisVersionName="1.0.${{ github.run_number }}"
           cp app/build/outputs/apk/release/app-release.apk ../jarvis-assistant.apk
+      - name: Lint summary
+        run: cat phone/app/build/reports/lint-results-release.txt || true
       - name: Inspect APK
         run: |
           ls -la jarvis-assistant.apk
