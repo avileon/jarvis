@@ -25,19 +25,22 @@ print("UI TEXT:", " | ".join(items))
 EOF
 }
 shot() {
-  adb exec-out screencap -p > "/tmp/$1.png"
-  python3 - "$1" <<'EOF'
-import sys, base64, io
+  adb exec-out screencap -p > "/tmp/shots/$1.png"
+  echo "  (screenshot $1 captured)"
+}
+print_shots() {
+  python3 - <<'EOF2'
+import base64, io, glob, os
 from PIL import Image
-name = sys.argv[1]
-im = Image.open(f"/tmp/{name}.png").convert("RGB")
-im.thumbnail((320, 720))
-buf = io.BytesIO(); im.save(buf, "JPEG", quality=45)
-b = base64.b64encode(buf.getvalue()).decode()
-print(f"SHOT-BEGIN {name} {len(b)}")
-for i in range(0, len(b), 200): print(b[i:i+200])
-print(f"SHOT-END {name}")
-EOF
+for f in sorted(glob.glob("/tmp/shots/*.png")):
+    name = os.path.basename(f)[:-4]
+    im = Image.open(f).convert("RGB"); im.thumbnail((240, 540))
+    buf = io.BytesIO(); im.save(buf, "JPEG", quality=40)
+    b = base64.b64encode(buf.getvalue()).decode()
+    print(f"SHOT-BEGIN {name} {len(b)}")
+    for i in range(0, len(b), 1000): print(b[i:i+1000])
+    print(f"SHOT-END {name}")
+EOF2
 }
 call_check() { # $1 = expected number
   sleep 1
@@ -51,6 +54,8 @@ say() { # typed command into the engine, then wait for TTS/turn
   sleep "${2:-7}"
 }
 
+mkdir -p /tmp/shots
+main() {
 section "device"
 adb shell getprop ro.build.version.release; adb shell getprop ro.build.version.sdk
 adb install -r -g "$APK" | tail -1
@@ -151,4 +156,9 @@ section "crashes"
 if adb logcat -d -b crash | grep -q "$PKG"; then adb logcat -d -b crash | tail -40; fail "app crashed"; else pass "no crashes"; fi
 
 echo; echo "SMOKE RESULT: $FAILS failure(s)"
+}
+main > /tmp/report.txt 2>&1
+print_shots
+echo "==================== REPORT ===================="
+cat /tmp/report.txt
 exit 0
