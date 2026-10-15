@@ -59,8 +59,8 @@ class OpenWakeWord(
     fun process(chunk: ShortArray, onWake: (Float) -> Unit): Float? {
         require(chunk.size == CHUNK) { "chunk must be $CHUNK samples" }
         // Slide the raw window: keep the last 480 samples of context + the new chunk (int16-scaled floats).
-        if (rawFilled == raw.size) {
-            System.arraycopy(raw, CHUNK, raw, 0, MEL_CONTEXT)
+        if (rawFilled + CHUNK > raw.size) {
+            System.arraycopy(raw, rawFilled - MEL_CONTEXT, raw, 0, MEL_CONTEXT)
             rawFilled = MEL_CONTEXT
         }
         for (i in 0 until CHUNK) raw[rawFilled + i] = chunk[i].toFloat()

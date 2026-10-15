@@ -17,7 +17,6 @@ android {
         targetSdk = 36
         versionCode = (project.findProperty("jarvisVersionCode") as String?)?.toInt() ?: 1
         versionName = (project.findProperty("jarvisVersionName") as String?) ?: "1.0.0"
-        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
 
     signingConfigs {
@@ -34,7 +33,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            // x86_64 only for the CI emulator smoke test.
+            ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        }
         release {
+            // Galaxy S23 Ultra (and every current phone) is arm64.
+            ndk { abiFilters += listOf("arm64-v8a") }
             isMinifyEnabled = false
             val rel = signingConfigs.getByName("release")
             signingConfig = if (rel.storeFile != null) rel else signingConfigs.getByName("debug")
@@ -52,8 +57,9 @@ android {
     lint {
         abortOnError = false
         checkReleaseBuilds = false
+        textReport = true
+        textOutput = file("stdout")
     }
-    packaging { jniLibs { useLegacyPackaging = false } }
 }
 
 kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }

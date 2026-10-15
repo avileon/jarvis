@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: hooks for the automated emulator smoke test (never in the release APK). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+    <application>
+        <!-- Protected by DUMP: only adb shell / the system can send these broadcasts. -->
+        <receiver
+            android:name=".debug.DebugReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="il.co.vibit.jarvis.assistant.debug.SEED_CONTACTS" />
+                <action android:name="il.co.vibit.jarvis.assistant.debug.COMMAND" />
+                <action android:name="il.co.vibit.jarvis.assistant.debug.START_LISTENING" />
+                <action android:name="il.co.vibit.jarvis.assistant.debug.STATUS" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

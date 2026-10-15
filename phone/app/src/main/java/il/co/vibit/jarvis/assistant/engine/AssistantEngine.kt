@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.util.Log
+import il.co.vibit.jarvis.assistant.BuildConfig
 import il.co.vibit.jarvis.assistant.contacts.AndroidContactSource
 import il.co.vibit.jarvis.assistant.service.ListeningService
 import il.co.vibit.jarvis.assistant.settings.Settings
@@ -160,6 +161,8 @@ class AssistantEngine(
     }
 
     private suspend fun say(reply: Reply, userText: String?) {
+        // Utterances are logged in debug builds only (used by the emulator smoke test).
+        if (BuildConfig.DEBUG) Log.i(TAG, "turn user='$userText' reply='${reply.display}' action=${reply.action} expectAnswer=${reply.expectAnswer}")
         _state.update {
             it.copy(
                 phase = Phase.SPEAKING,
@@ -175,7 +178,9 @@ class AssistantEngine(
         when (action) {
             is Action.PlaceCall -> {
                 _state.update { it.copy(phase = Phase.CALLING) }
-                when (callPlacer.place(action.number, settings.current.directCall)) {
+                val result = callPlacer.place(action.number, settings.current.directCall)
+                if (BuildConfig.DEBUG) Log.i(TAG, "call ${action.number} -> $result")
+                when (result) {
                     CallPlacer.Result.PLACED, CallPlacer.Result.DIALER_OPENED ->
                         _events.tryEmit(EngineEvent.CallStarted(action.number, action.displayName))
                     CallPlacer.Result.FAILED -> say(Reply("לא הצלחתי לחייג. כדאי לבדוק את הרשאת החיוג."), null)
